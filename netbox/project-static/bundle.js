@@ -1,4 +1,5 @@
 const esbuild = require('esbuild');
+const glob = require('fast-glob');
 const { sassPlugin } = require('esbuild-sass-plugin');
 
 // Bundler options common to all bundle jobs.
@@ -13,6 +14,52 @@ const options = {
 
 // Get CLI arguments for optional overrides.
 const ARGS = process.argv.slice(2);
+
+/**
+ * esbuild plugin in to run PurgeCSS on the built CSS files to remove unused CSS from the final
+ * bundle.
+ *
+ * @param {import('purgecss').UserDefinedOptions} options
+ * @returns {import('esbuild').Plugin}
+ */
+function purgecssPlugin(options = {}) {
+  return {
+    name: 'purgecss',
+    setup(build) {
+      if (!build.initialOptions.metafile) {
+        throw new Error('`metafile` must be set to true in esbuild configuration');
+      }
+      const { PurgeCSS } = require('purgecss');
+      const fs = require('fs');
+
+      build.onEnd(async args => {
+        const outputKeys = Object.keys(args.metafile.outputs);
+        const css = outputKeys.filter(k => k.endsWith('.css'));
+
+        const content = await glob(
+          [
+            '../../**/*.html',
+            '../../**/*.py',
+            './src/**/*.ts',
+            './node_modules/bootstrap/js/src/*.{js,ts}',
+            './node_modules/slim-select/src/**/*.{js,ts}',
+          ],
+          {
+            ignore: ['**/test_*.py', '**/__tests__/**'],
+            absolute: true,
+          },
+        );
+
+        const purgeCSS = new PurgeCSS();
+        const res = await purgeCSS.purge({ ...options, content, css });
+
+        for (const { file, css } of res) {
+          await fs.promises.writeFile(file, css);
+        }
+      });
+    },
+  };
+}
 
 async function bundleGraphIQL() {
   try {
@@ -89,12 +136,17 @@ async function bundleStyles() {
     if (ARGS.includes('--no-cache')) {
       pluginOptions.cache = false;
     }
+
     let result = await esbuild.build({
       ...options,
       // Disable sourcemaps for CSS/SCSS files, see #7068
       sourcemap: false,
       entryPoints,
-      plugins: [sassPlugin(pluginOptions)],
+      metafile: true,
+      plugins: [
+        sassPlugin(pluginOptions),
+        purgecssPlugin({ safelist: { greedy: [/^ss-/, /^dropdown-/] } }),
+      ],
       loader: {
         '.eot': 'file',
         '.woff': 'file',
