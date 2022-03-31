@@ -7,4 +7,4 @@ A first-hop redundancy protocol (FHRP) enables multiple physical interfaces to p
 * Common Address Redundancy Protocol (CARP)
 * Gateway Load Balancing Protocol (GLBP)
 
-NetBox models these redundancy groups by protocol and group ID. Each group may optionally be assigned an authentication type and key. (Note that the authentication key is stored as a plaintext value in NetBox.) Each group may be assigned or more virtual IPv4 and/or IPv6 addresses.
+NetBox models these redundancy groups by protocol and group ID. Each group may optionally be assigned an authentication type and key. (Note that the authentication key is stored as a plaintext value in NetBox.) Each group may be assigned one or more virtual IPv4 and/or IPv6 addresses.
